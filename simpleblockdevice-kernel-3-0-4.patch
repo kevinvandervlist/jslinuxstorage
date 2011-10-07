@@ -1,0 +1,575 @@
+diff --git a/linux-3.0.4/drivers/block/Kconfig b/linux-3.0.4-patch/drivers/block/Kconfig
+index 717d6e4..f26a40f 100644
+--- a/linux-3.0.4/drivers/block/Kconfig
++++ b/linux-3.0.4-patch/drivers/block/Kconfig
+@@ -527,4 +527,15 @@ config BLK_DEV_RBD
+ 
+ 	  If unsure, say N.
+ 
++config SIMPLE_BLOCKDEV
++	tristate "Simple Block Device Support"
++	help
++	  Simple block device support, intended for JS/Linux.
++
++config SIMPLE_BLOCKDEV_DEBUG
++	tristate "Simple Block Device Debugging info"
++	depends on SIMPLE_BLOCKDEV
++	help
++	  Enable debugging information for the simple blockdev device
++
+ endif # BLK_DEV
+diff --git a/linux-3.0.4/drivers/block/Makefile b/linux-3.0.4-patch/drivers/block/Makefile
+index 76646e9..20a0281 100644
+--- a/linux-3.0.4/drivers/block/Makefile
++++ b/linux-3.0.4-patch/drivers/block/Makefile
+@@ -40,4 +40,6 @@ obj-$(CONFIG_XEN_BLKDEV_BACKEND)	+= xen-blkback/
+ obj-$(CONFIG_BLK_DEV_DRBD)     += drbd/
+ obj-$(CONFIG_BLK_DEV_RBD)     += rbd.o
+ 
++obj-$(CONFIG_SIMPLE_BLOCKDEV)     += simpleblock/
++
+ swim_mod-y	:= swim.o swim_asm.o
+diff --git a/linux-3.0.4-patch/drivers/block/simpleblock/Makefile b/linux-3.0.4-patch/drivers/block/simpleblock/Makefile
+new file mode 100644
+index 0000000..de14218
+--- /dev/null
++++ b/linux-3.0.4-patch/drivers/block/simpleblock/Makefile
+@@ -0,0 +1,7 @@
++ifdef CONFIG_SIMPLE_BLOCKDEV_DEBUG
++	ccflags-$(CONFIG_SIMPLE_BLOCKDEV) := -DSB_DEBUG
++endif
++
++obj-$(CONFIG_SIMPLE_BLOCKDEV) := simple-blockdev.o
++
++simple-blockdev-y	:= sb.o portio.o transfers.o
+diff --git a/linux-3.0.4-patch/drivers/block/simpleblock/portio.c b/linux-3.0.4-patch/drivers/block/simpleblock/portio.c
+new file mode 100644
+index 0000000..6c30b37
+--- /dev/null
++++ b/linux-3.0.4-patch/drivers/block/simpleblock/portio.c
+@@ -0,0 +1,100 @@
++/**
++ * Persistent storage for JS/Linux.
++ * Kernel driver.
++ * Copyright (C) 2011 Kevin van der Vlist
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Kevin van der Vlist - kevin@kevinvandervlist.nl
++ */
++
++#include <linux/types.h>
++#include <linux/io.h>
++
++#include "simpleblock.h"
++
++/**
++ * Read the status register. 
++ * Return it's status as a u8 byte.
++ */
++
++inline u8 sb_status(void) {
++  u8 val = inb(REG_BASE + REG_STATUS);
++  PDEBUG("sb_status: %x", val);  
++  return val;
++}
++
++/**
++ * Read the value register. 
++ * Return it's value as a u8 byte.
++ */
++
++inline u8 sb_readval(void) {
++  u8 val = inb(REG_BASE + REG_VAL);
++  PDEBUG("sb_readval: %x", val);  
++  return val;
++}
++
++/**
++ * Write the value register.
++ * Write as a u8 byte.
++ */
++
++inline void sb_writeval(u8 byte) {
++  outb(byte, REG_BASE + REG_VAL);
++  PDEBUG("sb_writeval: %x", byte);  
++}
++
++/**
++ * Set the operation mode.
++ * Write as a u8 byte.
++ */
++
++inline void sb_setopmode(u8 byte) {
++  outb(byte, REG_BASE + REG_OPMODE);
++  PDEBUG("sb_setopmode: %x", byte);  
++}
++
++/**
++ * Set the secloc register.
++ * FIFO register. First part is high end, second part is low.
++ * Write as a u8 byte.
++ */
++
++inline void sb_setsecloc(u8 byte) {
++  outb(byte, REG_BASE + REG_SECLOC);
++  PDEBUG("sb_setsecloc: %x", byte);  
++}
++
++/**
++ * Set the secbyte register.
++ * FIFO register. First part is high end, second part is low.
++ * Write as a u8 byte.
++ */
++
++inline void sb_setbyteloc(u8 byte) {
++  outb(byte, REG_BASE + REG_BYTELOC);
++  PDEBUG("sb_setbyteloc: %x", byte);  
++}
++
++/**
++ * Start the operation mode.
++ * The device will set the status to available when 
++ * it's finished.
++ */
++
++inline void sb_do_op(void) {
++  outb(0xff, REG_BASE + REG_DO_OP);
++  PDEBUG("sb_do_op: %x", 0xff);  
++}
+diff --git a/linux-3.0.4-patch/drivers/block/simpleblock/sb.c b/linux-3.0.4-patch/drivers/block/simpleblock/sb.c
+new file mode 100644
+index 0000000..adfb4b4
+--- /dev/null
++++ b/linux-3.0.4-patch/drivers/block/simpleblock/sb.c
+@@ -0,0 +1,238 @@
++/**
++ * Persistent storage for JS/Linux.
++ * Kernel driver.
++ * Copyright (C) 2011 Kevin van der Vlist
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Kevin van der Vlist - kevin@kevinvandervlist.nl
++ */
++
++/**
++ * SimpleBlockDevice driver
++ */
++
++#include "linux/fs.h"
++#include "linux/init.h"
++#include "linux/module.h"
++#include <linux/blkdev.h>
++#include <linux/hdreg.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/types.h>
++
++#include "simpleblock.h"
++
++// Driver is completely free
++MODULE_LICENSE("GPL");
++// Other Information
++MODULE_AUTHOR("Kevin van der Vlist <kevin@vandervlist.nl>");
++MODULE_DESCRIPTION("Simple Block device driver for JS/Linux");
++
++// Driver stuff
++struct sb_dev {
++  unsigned long size; // Sectorsize
++  spinlock_t lock; // Locking
++  struct gendisk *gd; // Gendisk struct
++  struct request_queue *queue; // Request queue
++};
++
++static struct sb_dev *sbd = NULL;
++
++/*
++ * The HDIO_GETGEO ioctl is handled in blkdev_ioctl(), which
++ * calls this. We need to implement getgeo, since we can't
++ * use tools such as fdisk to partition the drive otherwise.
++ */
++int sb_getgeo(struct block_device *bdev, struct hd_geometry * geo) {
++  long size;
++
++  PDEBUG("sb_getgeo");
++  /* We have no real geometry, of course, so make something up. */
++  size = sbd->size;
++  geo->cylinders = (size & ~0x3f) >> 6;
++  geo->heads = 1;
++  geo->sectors = 16;
++  geo->start = 0;
++  return 0;
++}
++
++// The device operations structure.
++static struct block_device_operations sb_fops = {
++        .owner           = THIS_MODULE,
++		.getgeo          = sb_getgeo
++};
++
++static void sb_transfer(struct sb_dev *dev, sector_t sector, unsigned long nsect, char *buffer, int write) {
++  unsigned int s;
++  unsigned int b;
++  u8 stat = 0x00;
++
++  #ifdef SB_DEBUG  
++  // Evaluate this if only in debug mode.
++  if (write) {
++	printk(KERN_WARNING "sb_transfer: WRITE sectors %u to %lu", (unsigned)sector, sector + nsect);
++  }	else {
++	printk(KERN_WARNING "sb_transfer: READ sectors %u to %lu", (unsigned)sector, sector + nsect);
++  }
++  #endif
++
++  // Each transfer happens in a spinlock:
++  spin_lock(&dev->lock);
++
++  for(s = 0; s < nsect; s++) {
++	b = 0;
++	for(b = 0; b < SECT_SIZE; b++) {
++	  // Do work for a write operation...
++	  if (write) {
++		sb_write_byte(sector + s, b, *buffer++, &stat);
++		if(stat) {
++		  printk(KERN_WARNING "simpleblock: The device isn't ready. Can't do sb_write_byte\n");
++		  goto release_lock;
++		}
++	  // Or for a read operation.
++	  }	else {
++	    *buffer++ = sb_read_byte(sector + s, b, &stat);
++		if(stat) {
++		  printk(KERN_WARNING "simpleblock: The device isn't ready. Can't do sb_read_byte\n");
++		  goto release_lock;
++		}
++	  }
++	}
++  }
++
++  release_lock:
++  // And release the spinlock anyway
++  spin_unlock(&dev->lock);
++
++  return;
++}
++
++static void sb_request(struct request_queue *q) {
++  struct request *req;
++  PDEBUG("sb_request");
++
++  req = blk_fetch_request(q);
++  while (req != NULL) {
++	// Check request type
++	if (req == NULL || (req->cmd_type != REQ_TYPE_FS)) {
++	  PDEBUG("sb_request: No REQ_TYPE_FS");
++	  __blk_end_request_all(req, -EIO);
++	  continue;
++	}
++	// Do transfer
++	sb_transfer(sbd, blk_rq_pos(req), blk_rq_cur_sectors(req), req->buffer, rq_data_dir(req));
++	if (!__blk_end_request_cur(req, 0) ) {
++	  req = blk_fetch_request(q);
++	}
++  }
++
++  return;
++}
++
++// Initialize the device
++static int __init sb_init(void) {
++  int ret;
++  int major = MAJOR_NODE;
++
++  PDEBUG("sb_init");
++  // Request registers. REG_MAX is max register
++  if(request_region(REG_BASE, REG_MAX, DEV_NAME) == NULL) {
++	printk(KERN_WARNING "simpleblock: unable to register IOPorts %03x:%d\n", REG_BASE, REG_MAX);
++	return -EBUSY;
++  }
++  ret = register_blkdev(MAJOR_NODE, DEV_NAME);
++
++  if((ret <= 0) && (!MAJOR_NODE)) {
++	printk(KERN_WARNING "simpleblock: unable to register dynamic major number\n");
++	return -EBUSY;
++  }
++  if((ret > 0) && (!MAJOR_NODE)) {
++	printk(KERN_NOTICE "simpleblock: Received dynamic major %d\n", ret);
++	major = ret;
++  }
++
++  if((ret != 0) && (MAJOR_NODE)) {
++	printk(KERN_WARNING "simpleblock: unable to register static major number %d\n", MAJOR_NODE);
++	return -EBUSY;
++  }
++  
++  // Alloc space for struct
++  PDEBUG("kmalloc(sb_dev)");
++  sbd = kmalloc(sizeof(struct sb_dev), GFP_KERNEL);
++  if(sbd == NULL) {
++	goto emergency_clean;
++  }
++  sbd->size = SECT_SIZE * SECT_CNT;
++
++  // Create spinlock
++  PDEBUG("spin_lock_init");
++  spin_lock_init(&sbd->lock);
++  
++  // Init queue
++  PDEBUG("blk_init_queue");
++  sbd->queue = blk_init_queue(sb_request, &sbd->lock);
++  if(sbd->queue == NULL) {
++	goto emergency_clean;
++  }
++
++  // Init gendisk stuff
++  PDEBUG("alloc_disk");
++  sbd->gd = alloc_disk(MINORS);
++  if(!sbd->gd) {
++	goto emergency_clean;
++  }
++  sbd->gd->major = major;
++  
++  // Set some extra settings
++  PDEBUG("set some extra sbd->gd settings");
++  sbd->gd->first_minor = 0;
++  sbd->gd->queue = sbd->queue;
++  sbd->gd->private_data = sbd;
++
++  // Device ops
++  sbd->gd->fops = &sb_fops;
++
++  PDEBUG("set sbd->gd->disk_name");
++  strcpy(sbd->gd->disk_name, "sb");
++  // Size: number of sectors * size of each sect
++  set_capacity(sbd->gd, SECT_CNT);
++
++  // Tell the kernel about the disk
++  PDEBUG("add_disk");
++  add_disk(sbd->gd);
++
++  PDEBUG("Returning sb_init");
++  return 0;
++
++ emergency_clean:
++  printk(KERN_WARNING "simpleblock: unable to allocate memory\n");
++  release_region(REG_BASE, REG_MAX);
++  unregister_blkdev(MAJOR_NODE, DEV_NAME);
++  return -ENOMEM;
++}
++
++static void __exit sb_exit(void) {
++  PDEBUG("sb_exit");
++  // Free kernel memory
++  put_disk(sbd->gd);
++  del_gendisk(sbd->gd);
++  kfree(sbd);
++  unregister_blkdev(MAJOR_NODE, DEV_NAME);
++  release_region(REG_BASE, REG_MAX);
++}
++
++// Entrypoints for the kernel
++module_init(sb_init);
++module_exit(sb_exit);
+diff --git a/linux-3.0.4-patch/drivers/block/simpleblock/simpleblock.h b/linux-3.0.4-patch/drivers/block/simpleblock/simpleblock.h
+new file mode 100644
+index 0000000..5bb5c6c
+--- /dev/null
++++ b/linux-3.0.4-patch/drivers/block/simpleblock/simpleblock.h
+@@ -0,0 +1,78 @@
++/**
++ * Persistent storage for JS/Linux.
++ * Kernel driver.
++ * Copyright (C) 2011 Kevin van der Vlist
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Kevin van der Vlist - kevin@kevinvandervlist.nl
++ */
++
++#ifndef DRIVER_SIMPLE_BLOCK_H
++#define DRIVER_SIMPLE_BLOCK_H
++
++#include <linux/types.h>
++#include <linux/kernel.h>
++
++// Documentation/devices.txt: major device nodes
++// 240-254 block	LOCAL/EXPERIMENTAL USE
++// For dynamic allocation: 0
++#define MAJOR_NODE 250
++// Number of dev numbers (partitions etc)
++#define MINORS 16
++// Sector count
++#define SECT_CNT 2048
++// Size of each sector
++#define SECT_SIZE 512
++// Device name
++#define DEV_NAME "simpleblock"
++
++// Register information
++#define REG_BASE 0x3F0 // Base register
++#define REG_STATUS 0 // R: Status
++#define REG_VAL 1 // R/W: The value
++#define REG_OPMODE 2 //W: The operation mode (Read / Write)
++#define REG_SECLOC 3 // W:FIFO High 8 bit of address + Low 8 bit off address
++#define REG_BYTELOC 4 // W:FIFO High 8 bit of byte + Low 8 bit off byte
++#define REG_DO_OP 5 //W: Start the operation on the device
++
++#define REG_MAX REG_DO_OP // Max reg count for continuous allocation
++
++// Functions defined in portio 
++u8 sb_status(void);
++u8 sb_readval(void);
++void sb_writeval(u8);
++void sb_setopmode(u8);
++void sb_setsecloc(u8);
++void sb_setbyteloc(u8);
++void sb_do_op(void);
++
++// Transfer function stuff
++void sb_write_byte(unsigned int, unsigned int, char, u8*);
++u8 sb_read_byte(unsigned int, unsigned int, u8*);
++ 
++// Debug macro stuff
++#ifdef SB_DEBUG
++#  ifdef __KERNEL__
++    /* This one if debugging is on, and kernel space */
++#    define PDEBUG(fmt, args...) printk( KERN_DEBUG "SimpleBlock: " fmt, ## args)
++#  else
++     /* This one for user space */
++#    define PDEBUG(fmt, args...) fprintf(stderr, fmt, ## args)
++#  endif
++#else
++#  define PDEBUG(fmt, args...) /* not debugging: nothing */
++#endif
++
++#endif
+diff --git a/linux-3.0.4-patch/drivers/block/simpleblock/transfers.c b/linux-3.0.4-patch/drivers/block/simpleblock/transfers.c
+new file mode 100644
+index 0000000..7f99259
+--- /dev/null
++++ b/linux-3.0.4-patch/drivers/block/simpleblock/transfers.c
+@@ -0,0 +1,91 @@
++/**
++ * Persistent storage for JS/Linux.
++ * Kernel driver.
++ * Copyright (C) 2011 Kevin van der Vlist
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Kevin van der Vlist - kevin@kevinvandervlist.nl
++ */
++
++#include <linux/types.h>
++
++#include "simpleblock.h"
++
++void sb_write_byte(unsigned int sector, unsigned int byte, char val, u8 *status) {
++  u8 b = 0xff;
++  // First we have to verify if the device is available (status == 0x00)
++  if(sb_status() != 0x00) {
++	// Not ready for transfering
++	PDEBUG("sb_write_byte status(): %02x", sb_status());
++	*status = 0xff;
++	return;
++  }
++
++  // Set the operation mode
++  sb_setopmode(b);
++
++  // Set location information. Two bytes:
++  b = (sector & 0xff00) >> 8;
++  sb_setsecloc(b);
++  b = (sector & 0xff);
++  sb_setsecloc(b);
++
++  // Do the same for a byte:
++  b = (byte & 0xff00) >> 8;
++  sb_setbyteloc(b);
++  b = (byte & 0xff);
++  sb_setbyteloc(b);
++
++  // Now set the byte to transfer
++  sb_writeval(val);
++
++  // And finally start the operation
++  sb_do_op();
++  
++  return;
++}
++
++
++u8 sb_read_byte(unsigned int sector, unsigned int byte, u8 *status) {
++  u8 b = 0x00;
++  // First we have to verify if the device is available (status == 0x00)
++  if(sb_status() != 0x00) {
++	// Not ready for transfering
++	PDEBUG("sb_read_byte status(): %02x", sb_status());
++	*status = 0xff;
++	return 0xff;
++  }
++
++  // Set the operation mode
++  sb_setopmode(b);
++
++  // Set location information. Two bytes:
++  b = (sector & 0xff00) >> 8;
++  sb_setsecloc(b);
++  b = (sector & 0xff);
++  sb_setsecloc(b);
++
++  // Do the same for a byte:
++  b = (byte & 0xff00) >> 8;
++  sb_setbyteloc(b);
++  b = (byte & 0xff);
++  sb_setbyteloc(b);
++
++  // Do the operation 
++  sb_do_op();
++
++  // And finally start the operation
++  return sb_readval();
++}
