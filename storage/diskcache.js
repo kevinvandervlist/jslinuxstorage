@@ -20,6 +20,7 @@
  */
 
 function DiskCache(count, size) {
+	this.sectorCount = count;
 	this.sectorSize = size;
 	this.storage = new Uint8Array(count * size);
 }
@@ -30,8 +31,8 @@ function DiskCache(count, size) {
  * Byte: The requested byte location on a certain sector.
  */
 
-DiskCache.prototype.clearCache = function() {
-	this.storage = new Uint8Array(count * size);
+DiskCache.prototype.clearDisk = function() {
+	this.storage = new Uint8Array(this.sectorCount * this.sectorSize);
 }
 
 

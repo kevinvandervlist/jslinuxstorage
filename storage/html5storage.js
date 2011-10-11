@@ -156,3 +156,11 @@ HTML5Storage.prototype.flush = function() {
 		}
 	}
 }
+
+/**
+ * Clear (cached) disk
+  */
+
+HTML5Storage.prototype.clearDisk = function() {	
+	this.storage.clearDisk();
+}

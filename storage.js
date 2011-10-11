@@ -141,6 +141,13 @@ Storage.prototype.loadData = function(file) {
 }
 
 /**
+ * Clear disk data
+ */
+
+Storage.prototype.clearDisk = function() {
+}
+
+/**
  * Print a human readable (i.e. consistent padding) hexadecimal digit.
  * d: The digit to print.
  * padding: The amount of padding.

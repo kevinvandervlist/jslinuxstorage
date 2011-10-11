@@ -89,3 +89,11 @@ MemStorage.prototype.getByte = function(sector, byte) {
 MemStorage.prototype.setByte = function(sector, byte, value) {	
 	this.storage.setByte(sector, byte, value);
 }
+
+/**
+ * Clear (cached) disk
+  */
+
+MemStorage.prototype.clearDisk = function() {	
+	this.storage.clearDisk();
+}
