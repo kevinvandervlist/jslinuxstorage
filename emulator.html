@@ -27,6 +27,8 @@
 		  <script type="text/javascript" src="term.js"></script>
 		  <script type="text/javascript" src="cpux86-ta.js"></script>
 		  <script type="text/javascript" src="storage.js"></script>
+		  <script type="text/javascript" src="stringbuilder.js"></script>
+		  <script type="text/javascript" src="storage/diskcache.js"></script>
 		  <script type="text/javascript" src="storage/memstorage.js"></script>
 		  <script type="text/javascript" src="storage/html5storage.js"></script>
 		  <script type="text/javascript" src="storage/html5storagewords.js"></script>
@@ -56,6 +58,17 @@ v|15M|[kevin@lpt08a ~/jslinux]$ ls -lh linuxstart.bin vmlinux-3.0.4-simpleblock.
 -rwxr-xr-x 1 kevin kevin 1.7M Oct  6 16:04 vmlinux-3.0.4-simpleblock.bin
 -rw-r--r-- 1 kevin kevin 3.4M Oct  6 16:04 root.ext2
 			  </pre>
+		  </div>
+		  <div>
+			<input type="file" id="input" onchange="uploadFile(this.files[0])">
+			Upload filesystem image. Note: This doesn't work on all browsers.
+		  </div>
+		  <div>
+			<input type="button" value="Download filesystem image" onClick="download()">
+		  </div>
+			<input type="button" value="Clear local storage" onClick="localStorage.clear()">
+		  </div>
+		  <div id="download">
 		  </div>
 	</table>
   </body>

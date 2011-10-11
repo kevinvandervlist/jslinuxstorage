@@ -33,7 +33,7 @@ function MemStorage (count, size) {
 	Storage.call(this, count, size);
 
 	// Initialize storage
-	this.storage = new Uint8Array(this.sectorCount * this.sectorSize);
+	this.storage = new DiskStorage(this.sectorCount, this.sectorSize);
 
 	// Set the memorytype
 	this.memtype = Storage.prototype.type.MEMORY;
@@ -52,13 +52,31 @@ MemStorage.prototype = heir(Storage.prototype);
 MemStorage.prototype.constructor = MemStorage;
 
 /**
+ * Return a download link to the current filesystem image.
+ */
+
+Storage.prototype.getDownloadLink = function() {
+	return "<a href=\"" + this.storage.getDownloadLocation() + "\">Download disk image</a>";
+	;
+}
+
+/**
+ * Load a saved disk to memory.
+ * File: The File object received from <input>
+ */
+
+MemStorage.prototype.loadData = function(file) {	
+	this.storage(file);
+}
+
+/**
  * Read a certain byte from the storage backend.
  * Sector: The sector location of the requested byte.
  * Byte: The requested byte location on a certain sector.
  */
 
 MemStorage.prototype.getByte = function(sector, byte) {
-	return this.storage[(sector * this.sectorSize) + byte];
+	return this.storage.getByte(sector, byte);
 }
 
 /**
@@ -69,5 +87,5 @@ MemStorage.prototype.getByte = function(sector, byte) {
  */
 
 MemStorage.prototype.setByte = function(sector, byte, value) {	
-	this.storage[(sector * this.sectorSize) + byte] = value;
+	this.storage.setByte(sector, byte, value);
 }

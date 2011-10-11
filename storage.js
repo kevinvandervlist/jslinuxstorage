@@ -125,6 +125,22 @@ Storage.prototype.setByte = function(sector, byte, value) {
 }
 
 /**
+ * Return a download link to the current filesystem image.
+ */
+
+Storage.prototype.getDownloadLink = function() {
+	return;
+}
+
+/**
+ * Load a saved disk to memory.
+ * File: The File object received from <input>
+ */
+
+Storage.prototype.loadData = function(file) {	
+}
+
+/**
  * Print a human readable (i.e. consistent padding) hexadecimal digit.
  * d: The digit to print.
  * padding: The amount of padding.

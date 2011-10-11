@@ -35,14 +35,16 @@ function HTML5Storage(count, size) {
 		console.log("HTML5Storage backend enabled.");
 	}
 	
-	// Clear the local disk
-	// localStorage.clear();
+	// Initialize storage
+	this.storage = new DiskCache(this.sectorCount, this.sectorSize);
+
+	// Set the flush func
+	this.storage.flush = this.flush.bind(this);
 
 	// Some buffers
 	this.writebuffer = new StringBuilder();
-	this.readbuffer = new StringBuilder();
-	// Data in memory for faster reads.
-	this.cache = new Array();
+	var readbuffer = new StringBuilder();
+
 	
 	// Check local data
 	if(localStorage.getItem("jslinuxdisk") != "true") {
@@ -67,13 +69,12 @@ function HTML5Storage(count, size) {
 		if(s % 256 == 0) {
 			console.log("Caching sector %d...", s);
 		}
-		this.cache[s] = new Uint8Array(this.sectorSize);
 		var lsc = localStorage["s"+s];
 		for(var b = 0; b < this.sectorSize; b++) {
-			this.readbuffer.clear();
-			this.readbuffer.append(lsc[b*2]);
-			this.readbuffer.append(lsc[b*2+1]);
-			this.cache[s][b] = parseInt(this.readbuffer.toString(), this.RADIX);
+			readbuffer.clear();
+			readbuffer.append(lsc[b*2]);
+			readbuffer.append(lsc[b*2+1]);
+			this.storage.setByte(s, b, parseInt(readbuffer.toString(), this.RADIX));
 		}
 	}
 }
@@ -91,13 +92,31 @@ HTML5Storage.prototype = heir(Storage.prototype);
 HTML5Storage.prototype.constructor = HTML5Storage;
 
 /**
+ * Return a download link to the current filesystem image.
+ */
+
+HTML5Storage.prototype.getDownloadLink = function() {
+	return "<a href=\"" + this.storage.getDownloadLocation() + "\">Download disk image</a>";
+	;
+}
+
+/**
+ * Load a saved disk to memory.
+ * File: The File object received from <input>
+ */
+
+HTML5Storage.prototype.loadData = function(file) {	
+	this.storage.loadData(file);
+}
+
+/**
  * Read a certain byte from the storage backend.
  * Sector: The sector location of the requested byte.
  * Byte: The requested byte location on a certain sector.
  */
 
 HTML5Storage.prototype.getByte = function(sector, byte) {
-	return this.cache[sector][byte];	
+	return this.storage.getByte(sector, byte);
 }
 
 /**
@@ -109,7 +128,8 @@ HTML5Storage.prototype.getByte = function(sector, byte) {
 
 HTML5Storage.prototype.setByte = function(sector, byte, value) {
 	// Store in cache
-	this.cache[sector][byte] = value;
+	this.storage.setByte(sector, byte, value);
+
 	// Append to writebuffer.
 	this.writebuffer.append(this.dec2hex(value, 2));
 
@@ -120,24 +140,19 @@ HTML5Storage.prototype.setByte = function(sector, byte, value) {
 	}
 }
 
-// Initializes a new instance of the StringBuilder class
-// and appends the given value if supplied
-// http://www.codeproject.com/KB/scripting/stringbuilder.aspx
-function StringBuilder(value) {
-    this.strings = new Array("");
-    this.append(value);
-}
-// Appends the given value to the end of this instance.
-StringBuilder.prototype.append = function (value) {
-    if (value) {
-        this.strings.push(value);
-    }
-}
-// Clears the string buffer
-StringBuilder.prototype.clear = function () {
-    this.strings.length = 1;
-}
-// Converts this instance to a String.
-StringBuilder.prototype.toString = function () {
-    return this.strings.join("");
+
+/**
+ * Flush the disk
+  */
+
+HTML5Storage.prototype.flush = function() {	
+	for(var s = 0; s < this.sectorCount; s++) {
+		if(s % 256 == 0) {
+			console.log("Flushing sector %d...", s);
+		}
+		var lsc = localStorage["s"+s];
+		for(var b = 0; b < this.sectorSize; b++) {
+			this.setByte(s, b, this.getByte(s, b));
+		}
+	}
 }

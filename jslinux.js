@@ -10,6 +10,15 @@
 
 var term, pc, boot_start_time, sbd;
 
+function uploadFile(file) {
+	sbd.storage.loadData(file);
+}
+
+function download() {
+	document.getElementById("download").innerHTML = sbd.storage.getDownloadLink();
+}
+
+
 function term_start()
 {
     term = new Term(80, 30, term_handler);
