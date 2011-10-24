@@ -22,7 +22,11 @@
 function DiskCache(count, size) {
 	this.sectorCount = count;
 	this.sectorSize = size;
-	this.storage = new Uint8Array(count * size);
+	try {
+		this.storage = new Uint8Array(count * size);
+	} catch(e) {
+		this.storage = new Array(count * size);
+	}
 }
 
 /**
@@ -32,7 +36,11 @@ function DiskCache(count, size) {
  */
 
 DiskCache.prototype.clearDisk = function() {
-	this.storage = new Uint8Array(this.sectorCount * this.sectorSize);
+	try {
+		this.storage = new Uint8Array(this.sectorCount * this.sectorSize);
+	} catch(e) {
+		this.storage = new Array(this.sectorCount * this.sectorSize);
+	}
 }
 
 
@@ -98,7 +106,11 @@ DiskCache.prototype.loadData = function(file) {
 			return;
 		}
 		// The new disk cache
-		var img = new Uint8Array(this.result);
+		try {
+			var img = new Uint8Array(this.result);
+		} catch(e) {
+			var img = new Array(this.result);
+		}
 
 		if(img.length == this.cache.storage.length) {
 			this.cache.storage = img;
