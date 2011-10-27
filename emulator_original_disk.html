@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+  <head>
+	<title>Javascript PC Emulator - Persistent Storage</title>
+	<style>
+	  .term {
+      font-family: courier,fixed,swiss,monospace,sans-serif;
+      font-size: 14px;
+      color: #f0f0f0;
+      background: #000000;
+	  }
+	  .termReverse {
+      color: #000000;
+      background: #00ff00;
+	  }
+	  #note {
+      font-size: 12px;
+	  }
+	  #copyright {
+      font-size: 10px;
+	  }
+	</style>
+  </head>
+  <body onload="start()">
+	<table border="0">
+	  <tr valign="top"><td>
+		  <script type="text/javascript" src="term.js"></script>
+		  <script type="text/javascript" src="cpux86-ta.js"></script>
+		  <script type="text/javascript" src="cpux86.js"></script>
+		  <script type="text/javascript" src="storage.js"></script>
+		  <script type="text/javascript" src="stringbuilder.js"></script>
+		  <script type="text/javascript" src="storage/diskcache.js"></script>
+		  <script type="text/javascript" src="storage/memstorage.js"></script>
+		  <script type="text/javascript" src="storage/html5storage.js"></script>
+		  <script type="text/javascript" src="storage/html5storagewords.js"></script>
+		  <script type="text/javascript" src="simpleblockdevice.js"></script>
+		  <script type="text/javascript" src="jslinux_original_disk.js"></script>
+		  <div class="copyright">
+			&copy; 2011 Fabrice Bellard
+		  </div>
+		  <div>
+			<a href="http://bellard.org/jslinux">
+			  Fabrice Bellard's original JS/Linux website.
+			</a>
+		  </div>
+		  <div>
+			Storage modifications made by Kevin van der Vlist
+		  </div>
+		  <div>
+			<a href="https://github.com/kevinvandervlist/jslinuxstorage/blob/master/README">
+			  Technical details about the modifications.
+			</a>
+		  </div>
+		  <div class="info">
+			<p>Please keep the filesizes of the images in mind, downloading takes a while. Here are the file sizes:
+			  <pre>
+v|15M|[kevin@lpt08a ~/jslinux]$ ls -lh linuxstart.bin vmlinux-3.0.4-simpleblock.bin root.ext2
+-rwxr-xr-x 1 kevin kevin  15K Oct  6 16:04 linuxstart.bin
+-rwxr-xr-x 1 kevin kevin 1.7M Oct  6 16:04 vmlinux-3.0.4-simpleblock.bin
+-rw-r--r-- 1 kevin kevin 3.4M Oct  6 16:04 root.ext2
+			  </pre>
+		  </div>
+		  <div>
+			<input type="file" id="input" onchange="uploadFile(this.files[0])">
+			Upload filesystem image. Note: This doesn't work on all browsers.
+		  </div>
+		  <div>
+			<input type="button" value="Download filesystem image" onClick="download()">
+		  </div>
+			<input type="button" value="Clear local storage" onClick="localStorage.clear(); sbd.storage.clearDisk();">
+		  </div>
+		  <div id="download">
+		  </div>
+	</table>
+  </body>
+</html>
