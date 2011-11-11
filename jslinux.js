@@ -48,7 +48,7 @@ function start()
     params.serial_write = term.write.bind(term);
 
     /* memory size (in bytes) */
-    params.mem_size = 16 * 1024 * 1024;
+    params.mem_size = 12 * 1024 * 1024;
 
     params.get_boot_time = get_boot_time;
 
