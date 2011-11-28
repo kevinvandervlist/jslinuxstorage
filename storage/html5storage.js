@@ -65,16 +65,16 @@ function HTML5Storage(count, size) {
 		this.writebuffer.clear();
 		console.log("Done");
 	}
+	var lsc, t, str;
 	for(var s = 0; s < this.sectorCount; s++) {
 		if(s % 256 == 0) {
 			console.log("Caching sector %d...", s);
 		}
-		var lsc = localStorage["s"+s];
+		lsc = localStorage["s"+s];
 		for(var b = 0; b < this.sectorSize; b++) {
-			readbuffer.clear();
-			readbuffer.append(lsc[b*2]);
-			readbuffer.append(lsc[b*2+1]);
-			this.storage.setByte(s, b, parseInt(readbuffer.toString(), this.RADIX));
+			t = b*2;
+			str = lsc[t] + lsc[t+1];
+			this.storage.setByte(s, b, parseInt(str, this.RADIX));
 		}
 	}
 }
