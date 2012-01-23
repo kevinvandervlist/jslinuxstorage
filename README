@@ -1,0 +1,30 @@
+First of all, only these files in this archive are released under the terms of the GPL. 
+The following files, published on the demonstration website, _DO NOT_ fall under 
+these terms. I only have permission from Fabrice Bellard to host them.
+
+	cpux86-ta.js
+	term.js
+	
+These files are created and licensed by Fabrice Bellard (http://bellard.org/jslinux).
+
+
+
+This project allows the virtual machine to access a persistent block device. This means 
+a user can format and partition this device inside it's virtual machine. Because this disk
+is then stored in the HTML5 local storage, a return to the emulator's web page allows a 
+user to reopen the block device. All data stored on the disk can therefore be read again.
+
+Schematically, the process works in the following way:
+
+A block device driver is added to the Linux kernel. This allows a user to operate with 
+a 'device' written in JavaScript. This device is bound to the virtual machine using the 
+same I/O ports as a floppy disk. The device driver itself uses a temporary testing major 
+device node, id 250. Theoretically, it allows dynamic device node allocation, but I have
+not tested this.
+
+On the JavaScript side, a lot of caching occurs because the local storage interface is 
+quite slow. I therefore decided to cache the total 'disk' in memory, because it's about
+1M anyway. Writes are cached as well, and are 'flushed' once the driver has transferred
+a complete sector. 
+
+For more details, see the source code.
